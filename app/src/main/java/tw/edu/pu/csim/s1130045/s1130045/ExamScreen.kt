@@ -33,15 +33,18 @@ fun ExamScreen(modifier: Modifier = Modifier, viewModel: ExamViewModel = viewMod
     val displayMetrics = context.resources.displayMetrics
     val widthPx = displayMetrics.widthPixels
     val heightPx = displayMetrics.heightPixels
+    val density = displayMetrics.density // 取得螢幕密度
 
     // 初始化 ViewModel 中的螢幕尺寸
     LaunchedEffect(Unit) {
-        viewModel.initService(widthPx, heightPx)
+        viewModel.initService(widthPx, heightPx, density)
     }
 
     // 將 px 轉換為 dp
     val sizePx = 300
     val sizeDp = with(LocalDensity.current) { sizePx.toDp() }
+    val serviceSizeDp = 100.dp
+    val serviceSizePx = with(LocalDensity.current) { serviceSizeDp.toPx() }
 
     Box(
         modifier = modifier
@@ -68,7 +71,7 @@ fun ExamScreen(modifier: Modifier = Modifier, viewModel: ExamViewModel = viewMod
             Text(text = "螢幕大小：$widthPx * $heightPx")
 
             Spacer(modifier = Modifier.height(10.dp)) // 間距高度10dp
-            Text(text = "成績：0分")
+            Text(text = "成績：0分 ${viewModel.message}") // 顯示碰撞訊息
         }
 
         // role0: 嬰幼兒 (左邊切齊螢幕左邊，下方切齊螢幕高1/2)
@@ -114,8 +117,8 @@ fun ExamScreen(modifier: Modifier = Modifier, viewModel: ExamViewModel = viewMod
             painter = painterResource(id = viewModel.currentServiceId),
             contentDescription = "Service Icon",
             modifier = Modifier
-                .offset { IntOffset(viewModel.serviceX.roundToInt() - 50, viewModel.serviceY.roundToInt()) } // -50 是為了讓圖示中心對準 X 座標 (假設圖示寬約100px，可依實際需求調整)
-                .size(100.dp) // 設定圖示大小
+                .offset { IntOffset(viewModel.serviceX.roundToInt() - (serviceSizePx/2).roundToInt(), viewModel.serviceY.roundToInt()) } 
+                .size(serviceSizeDp) 
                 .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
