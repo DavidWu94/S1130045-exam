@@ -2,6 +2,7 @@ package tw.edu.pu.csim.s1130045.s1130045
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,14 +13,18 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlin.math.roundToInt
 
 @Composable
 fun ExamScreen(modifier: Modifier = Modifier, viewModel: ExamViewModel = viewModel()) {
@@ -28,6 +33,11 @@ fun ExamScreen(modifier: Modifier = Modifier, viewModel: ExamViewModel = viewMod
     val displayMetrics = context.resources.displayMetrics
     val widthPx = displayMetrics.widthPixels
     val heightPx = displayMetrics.heightPixels
+
+    // 初始化 ViewModel 中的螢幕尺寸
+    LaunchedEffect(Unit) {
+        viewModel.initService(widthPx, heightPx)
+    }
 
     // 將 px 轉換為 dp
     val sizePx = 300
@@ -97,6 +107,21 @@ fun ExamScreen(modifier: Modifier = Modifier, viewModel: ExamViewModel = viewMod
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .size(sizeDp)
+        )
+        
+        // 掉落的服務圖示
+        Image(
+            painter = painterResource(id = viewModel.currentServiceId),
+            contentDescription = "Service Icon",
+            modifier = Modifier
+                .offset { IntOffset(viewModel.serviceX.roundToInt() - 50, viewModel.serviceY.roundToInt()) } // -50 是為了讓圖示中心對準 X 座標 (假設圖示寬約100px，可依實際需求調整)
+                .size(100.dp) // 設定圖示大小
+                .pointerInput(Unit) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        viewModel.updateServiceX(dragAmount.x)
+                    }
+                }
         )
     }
 }
