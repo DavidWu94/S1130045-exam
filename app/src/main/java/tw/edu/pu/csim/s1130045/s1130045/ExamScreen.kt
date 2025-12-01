@@ -1,5 +1,6 @@
 package tw.edu.pu.csim.s1130045.s1130045
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -39,11 +40,19 @@ fun ExamScreen(modifier: Modifier = Modifier, viewModel: ExamViewModel = viewMod
     LaunchedEffect(Unit) {
         viewModel.initService(widthPx, heightPx, density)
     }
+    
+    // 監聽 Toast 訊息
+    LaunchedEffect(viewModel.toastMessage) {
+        viewModel.toastMessage?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.clearToastMessage()
+        }
+    }
 
     // 將 px 轉換為 dp
     val sizePx = 300
     val sizeDp = with(LocalDensity.current) { sizePx.toDp() }
-    val serviceSizeDp = 100.dp
+    val serviceSizeDp = 70.dp
     val serviceSizePx = with(LocalDensity.current) { serviceSizeDp.toPx() }
 
     Box(
@@ -71,7 +80,7 @@ fun ExamScreen(modifier: Modifier = Modifier, viewModel: ExamViewModel = viewMod
             Text(text = "螢幕大小：$widthPx * $heightPx")
 
             Spacer(modifier = Modifier.height(10.dp)) // 間距高度10dp
-            Text(text = "成績：0分 ${viewModel.message}") // 顯示碰撞訊息
+            Text(text = "成績：${viewModel.score}分 ${viewModel.message}") // 顯示成績和訊息
         }
 
         // role0: 嬰幼兒 (左邊切齊螢幕左邊，下方切齊螢幕高1/2)

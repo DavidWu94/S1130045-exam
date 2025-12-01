@@ -17,6 +17,10 @@ class ExamViewModel : ViewModel() {
     
     // 訊息狀態
     var message by mutableStateOf("")
+    
+    // 分數與 Toast 訊息
+    var score by mutableIntStateOf(0)
+    var toastMessage by mutableStateOf<String?>(null)
 
     // 螢幕寬高 與 密度
     private var screenWidthPx = 0
@@ -49,6 +53,7 @@ class ExamViewModel : ViewModel() {
         // 重置位置：水平置中，垂直在上方
         serviceX = (screenWidthPx / 2).toFloat() 
         serviceY = 0f
+        message = "" // 清除上一題的訊息
     }
 
     private fun startFalling() {
@@ -56,25 +61,70 @@ class ExamViewModel : ViewModel() {
             while (true) {
                 delay(100) // 每0.1秒
                 serviceY += 20 // 往下掉20px
+                
+                val collidedRole = checkCollisionAndGetRole()
+                var roundEnded = false
 
-                checkCollision()
-
-                // 碰撞檢測：如果超過螢幕高度
-                if (serviceY > screenHeightPx) {
-                    message = "(掉到最下方)"
+                if (collidedRole != -1) {
+                    // 發生碰撞
+                    handleRoundResult(collidedRole)
+                    roundEnded = true
+                } else if (serviceY > screenHeightPx) {
+                    // 掉到最下方
+                    handleRoundResult(-1) 
+                    roundEnded = true
+                }
+                
+                if (roundEnded) {
+                    delay(3000) // 暫停3秒
                     resetService()
                 }
             }
         }
     }
     
-    private fun checkCollision() {
-        // 角色大小 300px (在 ExamScreen 中透過 .size(sizeDp) 設定，這裡需要將 dp 轉回 px)
-        // 注意：ExamScreen 中使用了 300.dp (透過 sizePx.toDp() 再轉回 dp 可能會有差異，但原意應為 300px)
-        // 讓我們檢查 ExamScreen： val sizePx = 300; val sizeDp = with(LocalDensity.current) { sizePx.toDp() }
-        // 所以角色大小實際在 Compose 中是 300px 對應的 dp，但最終渲染大小在不同密度螢幕上就是接近 300px (如果是 Pixel perfect)
-        // 但 Compose 的 .toDp() 邏輯是 px / density。所以 sizeDp 在繪製時會佔用 sizeDp * density = sizePx 像素。
-        // 因此角色圖片在螢幕上的實際像素寬高就是 300px。
+    private fun handleRoundResult(collidedRole: Int) {
+        val correctRole = getCorrectRole(currentServiceId)
+        val answerText = getAnswerText(currentServiceId)
+        
+        if (collidedRole == -1) {
+            // 掉到最下方 (視為錯誤，扣分)
+            score -= 1
+            message = "掉到最下方"
+        } else {
+            if (collidedRole == correctRole) {
+                score += 1
+                message = "答對了！"
+            } else {
+                score -= 1
+                message = "答錯了！"
+            }
+        }
+        
+        // 設定 Toast 訊息
+        toastMessage = answerText
+    }
+    
+    private fun getCorrectRole(serviceIdRes: Int): Int {
+         return when (serviceIdRes) {
+            R.drawable.service0 -> 0 // 嬰幼兒
+            R.drawable.service1 -> 1 // 兒童
+            R.drawable.service2 -> 2 // 成人
+            else -> 3 // 一般民眾
+        }
+    }
+    
+    private fun getAnswerText(serviceIdRes: Int): String {
+        return when (serviceIdRes) {
+            R.drawable.service0 -> "極早期療育屬於嬰幼兒方面的服務"
+            R.drawable.service1 -> "離島服務屬於兒童方面的服務"
+            R.drawable.service2 -> "極重多障屬於成人方面的服務"
+            else -> "輔具服務屬於一般民眾方面的服務"
+        }
+    }
+
+    private fun checkCollisionAndGetRole(): Int {
+        // 角色大小 300px (基於 UI 設定)
         val roleSizePx = 300f 
         
         // 服務圖示大小 (ExamScreen 中是 50.dp)
@@ -87,55 +137,29 @@ class ExamViewModel : ViewModel() {
         val serviceRight = serviceLeft + serviceSizePx
         val serviceBottom = serviceTop + serviceSizePx
 
-        // 角色位置定義 (參考 ExamScreen)
-        // Role 0: 嬰幼兒 (Alignment.CenterStart -> offset y = -sizeDp/2)
-        // CenterStart: x=0, y=H/2. Top = H/2 - roleSizePx/2. Bottom = H/2 + roleSizePx/2 ?? 
-        // 不，ExamScreen 中是 offset(y = -sizeDp / 2)。
-        // CenterStart 的 Y 是 H/2。加上 offset -H_role/2 => Top = H/2 - H_role/2. Bottom = H/2 + H_role/2.
-        // 等等，ExamScreen 註解寫： "往上移動一半高度，使底部對齊中心線"
-        // 如果 Y 是 H/2，往上移 size/2 => Top = H/2 - size. Bottom = H/2.
-        // 這樣 Bottom 確實對齊中心線 (H/2)。
-        
-        // Role 0: 嬰幼兒 
-        // Left: 0
-        // Right: roleSizePx
-        // Top: (screenHeightPx / 2f) - roleSizePx
-        // Bottom: (screenHeightPx / 2f)
+        // 檢查與四個角色的碰撞
+        // Role 0: 嬰幼兒
         if (isOverlapping(serviceLeft, serviceTop, serviceRight, serviceBottom,
                 0f, (screenHeightPx / 2f) - roleSizePx, roleSizePx, (screenHeightPx / 2f))) {
-            message = "(碰撞嬰幼兒圖示)"
-            resetService()
+            return 0
         }
-        // Role 1: 兒童 (Alignment.CenterEnd -> offset y = -sizeDp/2)
-        // Left: W - roleSizePx
-        // Right: W
-        // Top: H/2 - roleSizePx
-        // Bottom: H/2
+        // Role 1: 兒童
         else if (isOverlapping(serviceLeft, serviceTop, serviceRight, serviceBottom,
                 (screenWidthPx - roleSizePx), (screenHeightPx / 2f) - roleSizePx, screenWidthPx.toFloat(), (screenHeightPx / 2f))) {
-            message = "(碰撞兒童圖示)"
-            resetService()
+            return 1
         }
-        // Role 2: 成人 (Alignment.BottomStart)
-        // Left: 0
-        // Right: roleSizePx
-        // Top: H - roleSizePx
-        // Bottom: H
+        // Role 2: 成人
         else if (isOverlapping(serviceLeft, serviceTop, serviceRight, serviceBottom,
                 0f, (screenHeightPx - roleSizePx), roleSizePx, screenHeightPx.toFloat())) {
-            message = "(碰撞成人圖示)"
-            resetService()
+            return 2
         }
-        // Role 3: 一般民眾 (Alignment.BottomEnd)
-        // Left: W - roleSizePx
-        // Right: W
-        // Top: H - roleSizePx
-        // Bottom: H
+        // Role 3: 一般民眾
         else if (isOverlapping(serviceLeft, serviceTop, serviceRight, serviceBottom,
                 (screenWidthPx - roleSizePx), (screenHeightPx - roleSizePx), screenWidthPx.toFloat(), screenHeightPx.toFloat())) {
-            message = "(碰撞一般民眾圖示)"
-            resetService()
+            return 3
         }
+        
+        return -1 // 未碰撞
     }
 
     private fun isOverlapping(l1: Float, t1: Float, r1: Float, b1: Float,
@@ -145,5 +169,9 @@ class ExamViewModel : ViewModel() {
     
     fun updateServiceX(delta: Float) {
         serviceX += delta
+    }
+    
+    fun clearToastMessage() {
+        toastMessage = null
     }
 }
